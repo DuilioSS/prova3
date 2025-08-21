@@ -1,71 +1,63 @@
+// Importazione del framework Express
 const express = require("express");
-const cors = require("cors");
-
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors());
+// Middleware per interpretare il corpo delle richieste POST in formato JSON
+// Fondamentale per ricevere i messaggi da Meta
 app.use(express.json());
 
-// "Database" temporaneo in memoria
-let users = [];
-let passwords = [];
+// Imposta la porta del server, usando quella fornita da Render o la 3000 come default
+const PORT = process.env.PORT || 3000;
 
-// Endpoint: Registrazione utente
-app.post("/register", (req, res) => {
-  const { email, password } = req.body;
+// Token di verifica. Scegli una stringa complessa e segreta.
+// DEVE essere la stessa che inserisci nel pannello di Meta for Developers.
+const VERIFY_TOKEN = "il_tuo_token_super_segreto_12345";
 
-  // Controllo se esiste già
-  const exists = users.find(u => u.email === email);
-  if (exists) {
-    return res.status(400).json({ message: "Email già registrata" });
+// ✅ Route radice ("/") per testare se il server è online
+// Risponde al problema "Cannot GET /"
+app.get("/", (req, res) => {
+  res.send("Il server del webhook è attivo e in ascolto! 🚀");
+});
+
+// ✅ Route per la verifica del webhook (richiesta GET da Meta)
+app.get("/webhook", (req, res) => {
+  console.log("Richiesta GET di verifica ricevuta da Meta.");
+
+  // Estrai i parametri dalla query string della richiesta
+  const mode = req.query["hub.mode"];
+  const token = req.query["hub.verify_token"];
+  const challenge = req.query["hub.challenge"];
+
+  // Verifica che 'hub.mode' sia 'subscribe' e che il token corrisponda
+  if (mode && token) {
+    if (mode === "subscribe" && token === VERIFY_TOKEN) {
+      console.log("Webhook verificato con successo! ✅");
+      // Rispondi con il valore di 'hub.challenge' per completare la verifica
+      res.status(200).send(challenge);
+    } else {
+      // Se il token o la modalità non sono corretti, rifiuta la richiesta
+      console.log("Verifica fallita: token o mode non validi.");
+      res.sendStatus(403); // Forbidden
+    }
+  } else {
+      // Se mancano i parametri, rispondi con un errore
+      console.log("Verifica fallita: parametri mancanti.");
+      res.sendStatus(400); // Bad Request
   }
-
-  users.push({ email, password });
-  res.json({ message: "Registrazione avvenuta con successo" });
 });
 
-// Endpoint: Login
-app.post("/login", (req, res) => {
-  const { email, password } = req.body;
+// ✅ Route per ricevere gli eventi/messaggi dal webhook (richiesta POST da Meta)
+app.post("/webhook", (req, res) => {
+  // Stampa il corpo della richiesta per debug
+  console.log("Richiesta POST ricevuta:", JSON.stringify(req.body, null, 2));
 
-  const user = users.find(u => u.email === email && u.password === password);
-  if (!user) {
-    return res.status(401).json({ message: "Credenziali errate" });
-  }
+  // Qui inserirai la logica per processare i messaggi ricevuti
 
-  res.json({ message: "Login effettuato", email: user.email });
+  // Rispondi subito con 200 OK per confermare la ricezione a Meta
+  res.sendStatus(200);
 });
 
-// Endpoint: Aggiungi password
-app.post("/passwords", (req, res) => {
-  const { email, service, password } = req.body;
-
-  passwords.push({ email, service, password });
-  res.json({ message: "Password salvata temporaneamente" });
-});
-
-// Endpoint: Recupera password per utente
-app.get("/passwords/:email", (req, res) => {
-  const email = req.params.email;
-  const userPasswords = passwords.filter(p => p.email === email);
-  res.json(userPasswords);
-});
-
-// Endpoint: Elimina password
-app.delete("/passwords/:email/:service", (req, res) => {
-  const { email, service } = req.params;
-  passwords = passwords.filter(p => !(p.email === email && p.service === service));
-  res.json({ message: "Password eliminata" });
-});
-
-// Endpoint salute (utile per test Render)
-app.get("/health", (req, res) => {
-  res.status(200).send("OK");
-});
-
-// Avvio server
+// Avvia il server sulla porta specificata
 app.listen(PORT, () => {
-  console.log(`✅ Server in ascolto sulla porta ${PORT}`);
+  console.log(`🚀 Server in ascolto sulla porta ${PORT}`);
 });
