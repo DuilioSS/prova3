@@ -60,7 +60,12 @@ app.delete("/passwords/:email/:service", (req, res) => {
   res.json({ message: "Password eliminata" });
 });
 
+// Endpoint salute (utile per test Render)
+app.get("/health", (req, res) => {
+  res.status(200).send("OK");
+});
+
 // Avvio server
 app.listen(PORT, () => {
-  console.log(`Server in ascolto sulla porta ${PORT}`);
+  console.log(`✅ Server in ascolto sulla porta ${PORT}`);
 });
