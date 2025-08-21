@@ -1,41 +1,66 @@
-// Importa Express.js
-const express = require('express');
-const app = express();
+const express = require("express");
+const cors = require("cors");
 
-// Middleware per leggere JSON
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(cors());
 app.use(express.json());
 
-// Porta e token di verifica (Render assegna PORT automaticamente)
-const port = process.env.PORT || 3000;
-const verifyToken = process.env.VERIFY_TOKEN || 'mio_token_segreto';
+// "Database" temporaneo in memoria
+let users = [];
+let passwords = [];
 
-// Endpoint GET: verifica Webhook Meta/WhatsApp
-app.get('/', (req, res) => {
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
+// Endpoint: Registrazione utente
+app.post("/register", (req, res) => {
+  const { email, password } = req.body;
 
-  if (mode === 'subscribe' && token === verifyToken && challenge) {
-    console.log('✅ WEBHOOK VERIFICATO');
-    return res.status(200).send(challenge);
+  // Controllo se esiste già
+  const exists = users.find(u => u.email === email);
+  if (exists) {
+    return res.status(400).json({ message: "Email già registrata" });
   }
 
-  // Risposta normale se non è una verifica
-  return res.status(200).send('OK');
+  users.push({ email, password });
+  res.json({ message: "Registrazione avvenuta con successo" });
 });
 
-// Endpoint POST: ricezione eventi Webhook
-app.post('/', (req, res) => {
-  const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
-  console.log(`📩 Webhook ricevuto alle ${timestamp}`);
-  console.log(JSON.stringify(req.body, null, 2));
-  res.sendStatus(200);
+// Endpoint: Login
+app.post("/login", (req, res) => {
+  const { email, password } = req.body;
+
+  const user = users.find(u => u.email === email && u.password === password);
+  if (!user) {
+    return res.status(401).json({ message: "Credenziali errate" });
+  }
+
+  res.json({ message: "Login effettuato", email: user.email });
 });
 
-// Endpoint salute (utile per test)
-app.get('/health', (req, res) => res.status(200).send('✅ healthy'));
+// Endpoint: Aggiungi password
+app.post("/passwords", (req, res) => {
+  const { email, service, password } = req.body;
+
+  passwords.push({ email, service, password });
+  res.json({ message: "Password salvata temporaneamente" });
+});
+
+// Endpoint: Recupera password per utente
+app.get("/passwords/:email", (req, res) => {
+  const email = req.params.email;
+  const userPasswords = passwords.filter(p => p.email === email);
+  res.json(userPasswords);
+});
+
+// Endpoint: Elimina password
+app.delete("/passwords/:email/:service", (req, res) => {
+  const { email, service } = req.params;
+  passwords = passwords.filter(p => !(p.email === email && p.service === service));
+  res.json({ message: "Password eliminata" });
+});
 
 // Avvio server
-app.listen(port, () => {
-  console.log(`🚀 Server avviato sulla porta ${port}`);
+app.listen(PORT, () => {
+  console.log(`Server in ascolto sulla porta ${PORT}`);
 });
