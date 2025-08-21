@@ -1,7 +1,6 @@
 {
-  "name": "webhook-meta-render",
+  "name": "mio-progetto-meta",
   "version": "1.0.0",
-  "description": "Webhook per Meta su Render",
   "main": "app.js",
   "scripts": {
     "start": "node app.js"

@@ -1,63 +1,73 @@
-// Importazione del framework Express
-const express = require("express");
+// Importa il framework Express
+const express = require('express');
 const app = express();
 
-// Middleware per interpretare il corpo delle richieste POST in formato JSON
-// Fondamentale per ricevere i messaggi da Meta
+// Middleware per permettere a Express di interpretare il corpo delle richieste POST in formato JSON
 app.use(express.json());
 
-// Imposta la porta del server, usando quella fornita da Render o la 3000 come default
+// Imposta la porta del server. Render fornirà la sua, altrimenti usa 3000 per i test locali.
 const PORT = process.env.PORT || 3000;
 
-// Token di verifica. Scegli una stringa complessa e segreta.
-// DEVE essere la stessa che inserisci nel pannello di Meta for Developers.
-const VERIFY_TOKEN = "il_tuo_token_super_segreto_12345";
+// ✅ Legge il token di verifica dalle variabili d'ambiente configurate su Render
+// Questa è la maniera più sicura e corretta.
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 
-// ✅ Route radice ("/") per testare se il server è online
-// Risponde al problema "Cannot GET /"
-app.get("/", (req, res) => {
-  res.send("Il server del webhook è attivo e in ascolto! 🚀");
+// Se il token non è stato impostato nelle variabili d'ambiente, ferma il server e avvisa.
+if (!VERIFY_TOKEN) {
+  console.error("ERRORE: VERIFY_TOKEN non è stato impostato nelle variabili d'ambiente.");
+  process.exit(1); // Esce dal processo con un codice di errore
+}
+
+// ✅ Rotta radice ("/") -> Risolve il "Cannot GET /"
+// Usata per un semplice controllo per vedere se il server è online.
+app.get('/', (req, res) => {
+  res.send('Server del Webhook per Meta è attivo! 🚀');
 });
 
-// ✅ Route per la verifica del webhook (richiesta GET da Meta)
-app.get("/webhook", (req, res) => {
-  console.log("Richiesta GET di verifica ricevuta da Meta.");
+// ✅ Rotta per la verifica del Webhook (richiesta GET da Meta)
+// Questa rotta è dedicata SOLO alla verifica iniziale.
+app.get('/webhook', (req, res) => {
+  console.log('Ricevuta richiesta di verifica GET al webhook...');
 
-  // Estrai i parametri dalla query string della richiesta
-  const mode = req.query["hub.mode"];
-  const token = req.query["hub.verify_token"];
-  const challenge = req.query["hub.challenge"];
+  // Estrae i parametri inviati da Meta
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
 
-  // Verifica che 'hub.mode' sia 'subscribe' e che il token corrisponda
+  // Controlla se 'mode' è 'subscribe' e se il token corrisponde a quello che abbiamo impostato
   if (mode && token) {
-    if (mode === "subscribe" && token === VERIFY_TOKEN) {
-      console.log("Webhook verificato con successo! ✅");
-      // Rispondi con il valore di 'hub.challenge' per completare la verifica
+    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+      console.log('✅ Webhook verificato con successo.');
+      // Risponde con il 'challenge' per confermare la verifica a Meta
       res.status(200).send(challenge);
     } else {
-      // Se il token o la modalità non sono corretti, rifiuta la richiesta
-      console.log("Verifica fallita: token o mode non validi.");
+      // Se il token o il 'mode' non corrispondono, rifiuta la richiesta
+      console.log('❌ Verifica webhook fallita: Token o mode non validi.');
       res.sendStatus(403); // Forbidden
     }
   } else {
-      // Se mancano i parametri, rispondi con un errore
-      console.log("Verifica fallita: parametri mancanti.");
+      console.log('❌ Verifica webhook fallita: Parametri mancanti.');
       res.sendStatus(400); // Bad Request
   }
 });
 
-// ✅ Route per ricevere gli eventi/messaggi dal webhook (richiesta POST da Meta)
-app.post("/webhook", (req, res) => {
-  // Stampa il corpo della richiesta per debug
-  console.log("Richiesta POST ricevuta:", JSON.stringify(req.body, null, 2));
+// ✅ Rotta per ricevere gli eventi/messaggi dal webhook (richiesta POST da Meta)
+// Qui arriveranno i messaggi, le foto, gli audio, ecc.
+app.post('/webhook', (req, res) => {
+  console.log('Ricevuto evento POST da Meta...');
+  console.log(JSON.stringify(req.body, null, 2));
 
-  // Qui inserirai la logica per processare i messaggi ricevuti
+  // ------------------------------------------------------------------
+  // QUI INIZIA LA LOGICA PER GESTIRE I MESSAGGI, FOTO, VIDEO, AUDIO
+  // Per ora, ci limitiamo a confermare la ricezione.
+  // ------------------------------------------------------------------
 
-  // Rispondi subito con 200 OK per confermare la ricezione a Meta
+  // Invia subito una risposta 200 OK a Meta per far sapere che hai ricevuto l'evento.
+  // Se non rispondi velocemente, Meta penserà che il tuo webhook non funziona.
   res.sendStatus(200);
 });
 
-// Avvia il server sulla porta specificata
+// Avvia il server
 app.listen(PORT, () => {
   console.log(`🚀 Server in ascolto sulla porta ${PORT}`);
 });
